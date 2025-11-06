@@ -23,12 +23,25 @@
       <button id="submit" name="submit" onclick="putSample()">Submit</button>
     </div>
   </div>
+  <div id="status">
+  </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
     const latTxt = $('lat');
     const lonTxt = $('lon');
     const pathTxt = $('path');
+    const statusDiv = $('status');
+
+    function setStatus(msg) {
+      statusDiv.innerText = msg;
+    }
+
+    function clearForm() {
+      latTxt.value = '';
+      lonTxt.value = '';
+      pathTxt.value = '';
+    }
 
     async function putSample() {
       const latVal = latTxt.value;
@@ -41,6 +54,8 @@
       };
 
       console.log(`putting ${payload}`);
+      setStatus('');
+
       const resp = await fetch('/put-sample', {
         method: 'POST',
         headers: {
@@ -50,7 +65,10 @@
       });
 
       if (!resp.ok) {
-        throw new Error('HTTP error ' + resp.status);
+        setStatus('HTTP error ' + resp.status);
+      } else {
+        setStatus('Sample saved!');
+        clearForm();
       }
     }
   </script>
