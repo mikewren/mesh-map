@@ -367,7 +367,7 @@ function buildIndexes(nodes) {
     }
 
     const path = s.path ?? [];
-    const heard = path > 0;
+    const heard = path.length > 0;
     coverage.rcv += heard ? 1 : 0;
     coverage.lost += !heard ? 1 : 0;
     coverage.time = Math.max(coverage.time, s.time);
