@@ -1,37 +1,98 @@
 // Consolidates old samples into coverage elements and archives them.
 import * as util from '../content/shared.js';
 
+// TODO: App-token for 'auth'?
+
+// Only the N-newest samples are kept so that
+// recent samples can eventually flip a coverage tile.
+const MAX_SAMPLES_PER_COVERAGE = 15;
+
 // Merge the new coverage data with the previous (if any).
 async function mergeCoverage(key, samples, store) {
   // Get existing coverage entry (or defaults).
   const entry = await store.getWithMetadata(key, "json");
-  const value = entry?.value ?? [];
-  const metadata = {
-    heard: entry?.metadata?.heard ?? 0,
-    lost: entry?.metadata?.lost ?? 0,
-    lastHeard: entry?.metadata?.lastHeard ?? 0,
-    updated: Date.now(),
-    hitRepeaters: entry?.metadata?.hitRepeaters ?? []
+  const prevRepeaters = entry?.metadata?.hitRepeaters ?? [];
+  const prevUpdated = entry?.metadata?.updated ?? 0;
+  let value = entry?.value ?? [];
+
+  // To avoid people spamming the coverage data and blowing
+  // up the history, merge the batch of new samples into
+  // one uber-entry per-consolidation. That way spamming
+  // has to happen over N consolidations.
+  const uberSample = {
+    time: 0,
+    heard: 0,
+    lost: 0,
+    lastHeard: 0,
+    repeaters: [],
   };
 
-  // Add new, distinct samples to the value list.
+  // Build the uber sample.
   samples.forEach(s => {
-    const found = value.find(v => v.time == s.time);
-    if (!found) 
-      value.push({ time: s.time, path: s.path });
+    // Was this sample handled in a previous batch?
+    if (s.time <= prevUpdated)
+      return;
+
+    uberSample.time = Math.max(s.time, uberSample.time);
+
+    if (s.path?.length > 0) {
+      uberSample.heard++;
+      uberSample.lastHeard = Math.max(s.time, uberSample.lastHeard);
+      s.path.forEach(p => {
+        if (!uberSample.repeaters.includes(p))
+          uberSample.repeaters.push(p);
+      });
+    } else {
+      uberSample.lost++;
+    }
   });
 
-  // Go through all values and compute stats.
-  const pathSet = new Set(metadata.hitRepeaters);
-  value.forEach(s => {
-    const heard = s.path.length > 0
-    metadata.heard += heard ? 1 : 0;
-    metadata.lost += !heard ? 1 : 0;
-    metadata.lastHeard = Math.max(metadata.lastHeard, s.time);
-    s.path.forEach(p => pathSet.add(p.toLowerCase()));
+  // If uberSample has invalid time, all samples must have
+  // been handled previously, nothing to do.
+  if (uberSample.time === 0)
+    return;
+
+  // Migrate existing values to the new format.
+  value.forEach(v => {
+    // An older version saved 'time' as a string. Yuck.
+    v.time = Number(v.time);
+
+    if (v.heard === undefined) {
+      // Old format -- update.
+      const wasHeard = v.path?.length > 0;
+      v.heard = wasHeard ? 1 : 0;
+      v.lost = wasHeard ? 0 : 1;
+      v.lastHeard = wasHeard ? v.time : 0;
+      v.repeaters = v.path;
+      delete v.path;
+    }
   });
 
-  metadata.hitRepeaters = [...pathSet];
+  value.push(uberSample);
+
+  // Are there too many samples?
+  if (value.length > MAX_SAMPLES_PER_COVERAGE) {
+    // Sort and keep the N-newest.
+    value = value.toSorted((a, b) => a.time - b.time).slice(-MAX_SAMPLES_PER_COVERAGE);
+  }
+  
+  // Compute new metadata stats, but keep the existing repeater list (for now).
+  const metadata = {
+    heard: 0,
+    lost: 0,
+    lastHeard: 0,
+    updated: uberSample.time,
+    hitRepeaters: []
+  };
+  const repeaterSet = new Set(prevRepeaters);
+  value.forEach(v => {
+    metadata.heard += v.heard;
+    metadata.lost += v.lost;
+    metadata.lastHeard = Math.max(metadata.lastHeard, v.lastHeard);
+    v.repeaters.forEach(r => repeaterSet.add(r.toLowerCase()));
+  });
+  metadata.hitRepeaters = [...repeaterSet];
+
   await store.put(key, JSON.stringify(value), { metadata: metadata });
 }
 
@@ -80,7 +141,7 @@ export async function onRequest(context) {
   result.coverage_entites_to_update = hashToSamples.size
   const mergedKeys = [];
 
-  // Merge old samples into coverage data.
+  // Merge old samples into coverage items.
   await Promise.all(hashToSamples.entries().map(async ([k, v]) => {
     try {
       await mergeCoverage(k, v, coverageStore);
