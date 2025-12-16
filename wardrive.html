@@ -19,12 +19,10 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <style>
-    .marker-shadow {
-      filter: drop-shadow(0px 2px 2px rgba(0,0,0,.3));
-      -webkit-filter: drop-shadow(0px 2px 2px rgba(0,0,0,.3));
+    .leaflet-interactive.marker-shadow {
+      filter: url(#marker-shadow);
     }
   </style>
-
 </head>
 
 <body class="bg-slate-900 text-slate-100">
@@ -117,6 +115,15 @@
     import { onLoad } from '/content/wardrive.js';
     onLoad();
   </script>
-</body>
 
+  <!-- iOS Safari SVG shadow hack -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <filter id="marker-shadow" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="1" dy="3" stdDeviation="1"
+          flood-color="black" flood-opacity="0.3"/>
+      </filter>
+    </defs>
+  </svg>
+</body>
 </html>
