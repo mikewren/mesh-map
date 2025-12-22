@@ -39,7 +39,7 @@ export function haversineMiles(a, b) {
 }
 
 // The center position to use for point filtering.
-export const centerPos = [47.7776, -122.4247];
+export const centerPos = [42.64, -73.82];
 export const maxDistanceMiles = 60;
 
 export function isValidLocation(p) {
