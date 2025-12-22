@@ -1073,7 +1073,7 @@ function haversineMiles(a2, b2) {
   const h2 = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h2));
 }
-var centerPos = [47.7776, -122.4247];
+var centerPos = [42.64, -73.82];
 var maxDistanceMiles = 60;
 function isValidLocation(p2) {
   const [lat, lon] = p2;
